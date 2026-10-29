@@ -1,10 +1,88 @@
 # Dezentrale Netzwerkarchitektur
-```
+```txt
 Projektname: Public Key Network
 Kurzname:    PKN
 Repo:        public-key-network
 Test-TLD:    .pkn.alt
 Ziel-TLD:    .pkn
+```
+```txt
+Regeln:
+- Ein globales Netzwerk: PKN verwendet eine eindeutige network_id; Pakete und Zustände anderer Netzwerke werden abgelehnt.
+- Public Key als Identität: Jeder Teilnehmer wird ausschließlich durch seinen dauerhaften Identity Public Key identifiziert.
+- Keine IP-basierte Identität: IP-Adressen sind ausschließlich kurzlebige Transport-Locators und niemals die Identität eines Teilnehmers.
+- Identische Protokollbasis: Jeder Node verwendet dieselben Protokolle und kann Client, Server, Validator, Router oder Relay sein.
+- Capability-basierte Teilnahme: Die tatsächlich verfügbaren Funktionen eines Nodes werden durch signierte Capabilities angegeben.
+- Lokale Schlüsselerzeugung: Sämtliche privaten Schlüssel werden ausschließlich lokal aus einem softwaregenerierten Master Seed abgeleitet.
+- Master Seed bleibt geheim: Der Master Seed wird niemals übertragen, veröffentlicht oder in der Blockchain gespeichert.
+- Ausreichende Entropie: Der Master Seed muss mindestens 128 Bit kryptografisch sichere Entropie und eine Prüfsumme besitzen.
+- Deterministische Wiederherstellung: Derselbe Master Seed erzeugt zusammen mit derselben Network ID und Key-Version immer dieselben Schlüssel.
+- Domain Separation: Identity-, Registry-, Discovery-, Transport- und Recovery-Schlüssel werden mit unterschiedlichen KDF-Kontexten abgeleitet.
+- Getrennte Schlüsselzwecke: Ein Schlüssel darf ausschließlich für den ihm zugewiesenen Protokollzweck verwendet werden.
+- Identity Key schützen: Der dauerhafte Identity Private Key wird nur für Delegationen, Widerrufe und Identitätsrotationen verwendet.
+- Signierte Delegationen: Funktionsschlüssel sind nur gültig, wenn sie durch eine überprüfbare Delegationskette vom Identity Key autorisiert wurden.
+- Schlüsselversionierung: Jede Delegation enthält eine Key-Version, damit Algorithmen und Schlüssel kontrolliert ersetzt werden können.
+- Atomarer Key-Swap: Eine Identitätsübertragung wird nur gültig, wenn alter und neuer Identity Key dieselbe Rotation signieren.
+- Keine Registrierungsunterbrechung: Bei einem finalisierten Key-Swap bleiben alle übertragenen Domains durchgehend registriert.
+- Widerruf alter Schlüssel: Nach einer finalisierten Rotation werden alte Schlüssel für neue Operationen abgelehnt.
+- Domainbesitz on-chain: Die Zuordnung einer .pkn-Domain zu einer Identität wird ausschließlich im finalisierten Registry State bestimmt.
+- Jährliche Verlängerung: Eine Domain muss spätestens innerhalb des festgelegten Registrierungszeitraums durch ihren Besitzer verlängert werden.
+- Monotone Sequenznummern: Domainoperationen werden nur akzeptiert, wenn ihre Sequenznummer exakt auf dem gültigen Vorgängerzustand aufbaut.
+- Deterministische Konfliktprüfung: Für eine Domain kann in einem finalisierten State immer nur genau ein Besitzer gültig sein.
+- Harte Finalität: Nur finalisierte Blöcke und State Roots dürfen für Registry-, Delegations- und Widerrufsentscheidungen verwendet werden.
+- Keine Finalität ohne Quorum: Kann der erforderliche Konsens nicht erreicht werden, werden keine neuen Registry-Zustände finalisiert.
+- Discovery bleibt flüchtig: Locate Requests, Locate Responses, Rückwege und IP-Adressen werden nicht dauerhaft in der Blockchain gespeichert.
+- Keine zentrale Discovery-Instanz: Kein einzelner Node ist für Namensauflösung, Discovery, Routing oder Erreichbarkeit zwingend erforderlich.
+- Dezentrale Rendezvous-Leases: Online-Nodes hinterlegen bei mehreren zuständigen Key-Space-Nodes kurzlebige, signierte Erreichbarkeitsbereitschaften.
+- Mehrfache Replikation: Rendezvous-Leases werden bei mehreren mathematisch unabhängigen Nodes repliziert.
+- Kurze Gültigkeit: Discovery- und Rendezvous-Daten erhalten eine feste TTL und werden nach Ablauf nicht mehr verwendet.
+- Keine ungeprüften Locator: Ein Endpoint oder Relay-Pfad wird nur akzeptiert, wenn er vom erwarteten Ziel oder einem autorisierten Sitzungsschlüssel signiert wurde.
+- Locator-Vertraulichkeit: Direkte IP-Adressen und Ports werden ausschließlich verschlüsselt an den konkreten Kommunikationspartner übertragen.
+- Public-Key-Routing: Overlay-Entscheidungen erfolgen anhand kryptografischer Node-Identitäten und nicht anhand öffentlich sichtbarer IP-Identitäten.
+- Redundante Routingpfade: Locate Requests werden über mehrere unabhängige key-basierte Pfade weitergeleitet.
+- Kein vollständiger Index erforderlich: Jeder Node verwaltet nur einen begrenzten Ausschnitt der Routing- und Rendezvous-Informationen.
+- Bestehende Peer-Kanäle: Overlay-Pakete werden bevorzugt über bereits authentifizierte und verschlüsselte Node-zu-Node-Verbindungen übertragen.
+- Reverse Routing: Antworten verwenden die kurzzeitig gecachte Rückroute der zugehörigen Request-ID.
+- Begrenzte Hop-Anzahl: Jedes weitergeleitete Paket besitzt ein Hop Limit und wird nach dessen Verbrauch verworfen.
+- Schleifenerkennung: Request-ID und Path Nonce verhindern wiederholte Verarbeitung und Routing-Schleifen.
+- Kanonische Paketkodierung: Vor dem Signieren werden alle Pakete eindeutig und deterministisch serialisiert.
+- Vollständige Paketsignatur: Alle sicherheitsrelevanten Felder eines Pakets werden durch die Signatur abgedeckt.
+- Manipulierte Pakete verwerfen: Jede Änderung an signierten Feldern führt zur sofortigen Ablehnung des Pakets.
+- Replay-Schutz: Bereits verarbeitete Request-IDs, abgelaufene Pakete und ungültige Sequenznummern werden verworfen.
+- Blockchain-Bindung: Discovery-Anfragen werden nur akzeptiert, wenn ihre Identität und Delegationskette gegen einen finalisierten State Root validierbar sind.
+- Lokale Validierung: Jeder Node prüft Blockchain-Proofs, Delegationen, Signaturen und Gültigkeitszeiten selbstständig.
+- Kein Vertrauen in Weiterleitungsnodes: Zwischennodes dürfen vollständig kompromittiert sein, ohne gültige Identitäten oder Nutzdaten fälschen zu können.
+- Ende-zu-Ende-Verschlüsselung: Locator-Daten und Nutzdaten bleiben gegenüber Routing- und Relay-Nodes verschlüsselt.
+- Ephemerer Schlüsselaustausch: Jede neue Verbindung verwendet ein neues ephemeres Diffie-Hellman-Schlüsselpaar.
+- Authentifizierter Handshake: Das vollständige Handshake-Transkript wird mit den autorisierten Transport Keys signiert.
+- Forward Secrecy: Die Kompromittierung eines dauerhaften Identity Keys darf vergangene Sitzungsschlüssel nicht offenlegen.
+- Getrennte Richtungsschlüssel: Für beide Übertragungsrichtungen werden unabhängige symmetrische Schlüssel abgeleitet.
+- AEAD-Pflicht: Nutzdaten werden ausschließlich mit einem authentifizierten Verschlüsselungsverfahren übertragen.
+- Sequenzbasierter Nachrichtenschutz: Jede verschlüsselte Sitzung verwendet Sequenznummern oder Nonces gegen Wiederholung und Vertauschung.
+- Regelmäßiges Rekeying: Lang laufende Verbindungen erneuern ihre Sitzungsschlüssel nach einer definierten Datenmenge oder Zeit.
+- Direktverbindung bevorzugt: Nach erfolgreicher Discovery wird zunächst eine direkte Verbindung zum Ziel versucht.
+- NAT Traversal als zweiter Weg: Ist keine direkte Verbindung möglich, darf ein kurzlebiges, signiertes NAT-Traversal-Verfahren genutzt werden.
+- Relay als Fallback: Erst nach fehlgeschlagener Direktverbindung wird ein austauschbarer Relay-Pfad verwendet.
+- Relay ohne Klartextzugriff: Ein Relay darf Nutzdaten weiterleiten, aber nicht entschlüsseln oder unbemerkt verändern können.
+- Mehrere Relay-Optionen: Kein Ziel darf dauerhaft von einem einzelnen Relay abhängig sein.
+- Frühe Billigprüfung: Format, Größe, Version, Network ID, TTL und Hop Limit werden vor teuren kryptografischen Berechnungen geprüft.
+- Feste Paketgrößenlimits: Jeder Pakettyp besitzt eine klar definierte maximale Größe.
+- Stateless Cookies: Ein Ziel legt vor dem Nachweis eines erreichbaren Rückwegs keinen teuren Sitzungszustand an.
+- Adaptive Arbeitsnachweise: Bei hoher Netzlast kann die erforderliche Proof-of-Work-Schwierigkeit für neue Requests steigen.
+- Identitätsbasierte Limits: Request-Limits werden mindestens pro Identity Key, Session Key, Ziel und Epoch angewendet.
+- Keine absolute DDoS-Garantie: Das Protokoll begrenzt Angriffsverstärkung und Ressourcenkosten, kann physische Bandbreitenüberlastung aber nicht mathematisch ausschließen.
+- Begrenzte Caches: Jeder lokale TTL-Cache besitzt harte Grenzen für Anzahl, Größe und Lebensdauer seiner Einträge.
+- Keine dauerhafte Request-Historie: Abgelaufene Discovery-Pakete werden aus dem aktiven Cache entfernt und nicht in Registry-Blöcke übernommen.
+- Cryptographic Erasure: Flüchtige Daten werden verschlüsselt gespeichert; nach Ablauf werden die zugehörigen Schlüssel verworfen.
+- Pruning-Unterstützung: Abgelaufene Session-, Delegations- und historische Transaktionsdaten dürfen nach den Konsensregeln entfernt werden.
+- Compact-Node-Unterstützung: Mobile Clients dürfen State Roots und Merkle Proofs verwenden, ohne die vollständige Blockchain zu speichern.
+- Keine ungeprüften Snapshots: Ein Snapshot ist nur gültig, wenn sein State Root durch die finalisierte Blockchain bestätigt wird.
+- Bootstrap ist keine Autorität: Fest eingetragene Bootstrap-Nodes vermitteln nur erste Peer-Verbindungen und dürfen keine gültigen Registry-Zustände bestimmen.
+- Mehrere Bootstrap-Quellen: Eine Erstverbindung muss über mehrere unabhängige Bootstrap-Methoden möglich sein.
+- Protokollversionierung: Jedes Paket enthält eine Network ID und Protokollversion; unbekannte Pflichtversionen werden abgelehnt.
+- Algorithmusagilität: Kryptografische Algorithmen müssen versioniert und durch finalisierte Protokollregeln austauschbar sein.
+- Fail-closed-Verhalten: Kann eine Signatur, Delegation, Finalität oder Gültigkeitszeit nicht sicher geprüft werden, wird die Operation abgelehnt.
+- Keine Sicherheitsentscheidung durch DNS: Konventionelles DNS darf höchstens für Bootstrap verwendet werden und bestimmt niemals PKN-Identität oder Domainbesitz.
 ```
 ```mermaid
 flowchart TB
