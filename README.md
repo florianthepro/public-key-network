@@ -1,5 +1,6 @@
 > [!CAUTION]
 > AI was used for ideation and architecture development in this repository.
+> 
 > AI was used to generate [assets](assets/) in this repository.
 
 # Public Key Network
