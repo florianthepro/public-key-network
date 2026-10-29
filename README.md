@@ -1,5 +1,5 @@
 > [!CAUTION]
-> Disclaimer: AI was used for ideation and vision development in this repository.
+> AI was used for ideation and architecture development in this repository.
 
 # Public Key Network
 
@@ -11,121 +11,211 @@ Ziel-TLD:    .pkn
 Status:      Architekturentwurf
 ```
 
-Public Key Network (PKN) ist ein dezentrales Namens-, Presence- und Verbindungsnetz. Eine `.pkn`-Domain verweist auf eine kryptografische Identität. Öffentliche IP-Adressen, NAT-Kandidaten und Relays dienen ausschließlich der Erreichbarkeit und begründen kein Vertrauen.
+Public Key Network (PKN) ist ein dezentrales Namens-, Presence- und Verbindungsnetz. Eine `.pkn`-Domain ist dauerhaft an einen Identity Public Key gebunden. Im NS-Record eingetragene IPv4-/IPv6-Adressen und Service-Endpoints werden regulär verwendet. Presence und Discovery greifen ein, wenn kein passender Endpoint eingetragen oder kein eingetragener Endpoint erreichbar ist.
 
-## Grundprinzip
+## Vertrauensmodell
 
 ```text
-Domain       → Identity Public Key
-Public Key   → eindeutige Identität
-IP/Port      → optionaler Transportweg
-Presence     → kurzlebige dynamische Erreichbarkeit
-Signatur     → Integrität und Kontrolle der Identität
-Handshake    → aktueller Besitznachweis
+Domain       -> Identity Public Key
+IP/Port      -> Transportweg
+Zertifikat   -> Service-Identität
+Signatur     -> Integrität und Berechtigung
+Handshake    -> aktueller Besitznachweis
 ```
 
-Der in der Blockchain registrierte Identity Public Key ist die Vertrauenswurzel einer Domain. Zertifikate, Discovery-Schlüssel, Transport-Schlüssel und Service-Schlüssel müssen entweder diesem Key entsprechen oder über eine gültige, zweckgebundene Signaturkette auf ihn zurückgeführt werden können.
+Der Identity Public Key im finalisierten Blockchain-State ist die Vertrauenswurzel einer Domain. IP-Adressen, Presence-Caches, Bootstrap-Nodes und Relays bestimmen nur die Erreichbarkeit.
 
-## <a href="https://www.devtoolsdaily.com/diagrams/mermaidjs/playground/?#v2=N4IgtghgTg1grgBxALhAMwDYHsDuBjAC2gBcACAFQCEAdAO1IdIEEAFFgbWpEqlwGcAplFIB6ZrRwDaAEzi0A5lwC6pALSqAfMwDiAUQBy5TiAAyWGBAxDSLANL7VTeVOLK6jHQfJrNpAMIAEkwAkvrGlNh4MIQQAJa0ADwARlAiGgAiWJDxpIBJhKTB0i6xxACeNnBJGLF4pLYCpcmpGlgIxLFYtJakaAJ8xAIFLABuACwiwSMAbG607ozkTABKekZcTDDtw9YAWrECGKoBWP3KPhoAPlyWVqQArKQAsvFwA3MgFzZLugDKBn66Yw-WLyWj7KADYQsKB9KR4QZLAR4LBQaRNNIARgez1orykpHkAB+MO1FCAlPMGCxvn99ADzk9fgFjAAxDCEwikwYANSEA1iGDk8nRGkJSWsdgcLAEQj4s0p-iCoQZP0W5GCfmAXBZfUhpF0MgQWHixBFwxRRBkUgA-FwAL4K1VMdV+c5XEAAKwgXE+6WC3z8axABukRpNpGksRhm1I2ygfDghCksw8Tpdbq4tAEOSwRWEYM5pCEMJqBCS0B9-iYgUBXH0AjguvxRJJIKkIuhsNo8NIiORqNjQkkVveFPojEeTIZfmrAV0CpnNYzIALBDI5qglqK719wR+fgA8tzdEsAJpAkFgvn4sx4CADXsCACOjf6IpgnWIvAw1T5g4h2ZWKOCp+vuR4nqeDI0iwB76H8xh7AcpC5tYfgQEmRwnGQv69BCIp8Je4JvDYMKCN2CJIii0jyuODB+gG3jqFoh76PouiBsY6RRgIMb5PozoUFAEBxnw3T5IiGAQKUKaMIuc7TrBbGBgq0GwX8Cmsex5ALopWkMkwACq5DMlwhTFGUqikHI0ikD8QjDDUAiqPUjQpGkzjOPQERYFEMTxM5DSkAgUCEr0wG0cwRkBAy6TOkwxghk5ABecCqIl-58IQ7J8IIJKDPorxJdI97JuSIB2kAA" target="_blank" rel="noopener noreferrer">Architektur</a>
+Zertifikate und Service-Schlüssel für beispielsweise HTTPS, Mail, XMPP oder andere Dienste sind gültig, wenn sie:
+
+- direkt dem Identity Public Key entsprechen, oder
+- über eine lückenlose, gültige und zweckgebundene Delegationskette zum Identity Public Key führen,
+- zur Domain, zum Dienst, zum Protokoll und gegebenenfalls zum Port passen,
+- nicht abgelaufen oder widerrufen sind,
+- im aktuellen Handshake durch Kontrolle des zugehörigen Private Keys bestätigt werden.
+
+## Gesamtarchitektur
+
 ```mermaid
 flowchart TB
     APP["Browser / Anwendung"] --> AGENT["Lokaler PKN-Agent"]
-    AGENT --> CHAIN["Blockchain<br/>Domain → Identity Public Key<br/>optional feste IPv4/IPv6"]
+    AGENT --> CHAIN["Finalisierte Blockchain<br/>Domain -> Identity Public Key<br/>NS- und Service-Records"]
 
-    TARGET["Aktiver Ziel-Host"] -->|"alle 5 Minuten"| PRESENCE["Signierter Presence Record<br/>15 Minuten gültig"]
+    CHAIN --> RECORDS{"Verwendbare Endpoints<br/>im NS-/Service-Record?"}
+    RECORDS -->|"ja"| DIRECT["IPv6/IPv4 und Service-Port<br/>regulär verwenden"]
+    RECORDS -->|"nein"| CACHE["Neuesten gültigen<br/>Presence Record verwenden"]
+    DIRECT -->|"nicht erreichbar oder<br/>Authentifizierung fehlgeschlagen"| CACHE
+
+    HOST["Aktiver Ziel-Host"] -->|"alle 5 Minuten"| PRESENCE["Signierter Presence Record<br/>15 Minuten gültig"]
     PRESENCE --> MESH["Flüchtige Verteilung<br/>über PKN-Peers"]
-
-    CHAIN --> STATIC{"Fester Endpoint<br/>vorhanden?"}
-    STATIC -->|"ja"| DIRECT["Endpoint direkt versuchen"]
-    STATIC -->|"nein oder nicht erreichbar"| CACHE["Neuesten gültigen<br/>Presence Record verwenden"]
     MESH --> CACHE
-    CACHE -->|"nicht vorhanden"| DISCOVERY["Signierten Locate Request<br/>kontrolliert verteilen"]
-    DISCOVERY --> RESPONSE["Ziel oder Cache-Host liefert<br/>signierten Presence Record"]
 
-    DIRECT --> CONNECT["Direkt → NAT Traversal → Relay"]
-    CACHE --> CONNECT
-    RESPONSE --> CONNECT
-    CONNECT --> AUTH["Identity- und Service-Key<br/>gegen Blockchain-Key prüfen"]
+    CACHE -->|"kein gültiger Record"| DISCOVERY["Signierten Locate Request<br/>kontrolliert verteilen"]
+    DISCOVERY --> RESPONSE["Ziel oder Cache-Host liefert<br/>vom Ziel signierten Record"]
+
+    CACHE --> CONNECTION["Direkt -> NAT Traversal -> Relay"]
+    RESPONSE --> CONNECTION
+    DIRECT --> CONNECTION
+    CONNECTION --> AUTH["Zertifikat / Service-Key<br/>gegen Identity Key prüfen"]
     AUTH --> DATA["Ende-zu-Ende verschlüsselte Nutzdaten"]
 ```
 
-## Blockchain-Daten
+## Blockchain-Records
 
-Ein Domain-Datensatz enthält mindestens:
+### NS-Record
+
+Jede `.pkn`-Domain besitzt einen finalisierten NS-Record:
 
 ```text
-NameRecord {
+NSRecord {
+    version
+    network_id
     domain
-    owner_identity_public_key
-    optional_static_endpoints[]
+    identity_public_key
+
+    ipv4_addresses[]
+    ipv6_addresses[]
+    default_port
+    default_transport
+    service_records[]
+
     delegation_root
     sequence_number
     registered_at
-    valid_until
+    domain_valid_until
     signature
 }
 ```
 
-Die Blockchain speichert dauerhaft:
+`identity_public_key` ist verpflichtend. Die Endpoint-Listen dürfen leer sein. Sobald ein Endpoint eingetragen ist, gehört er zum regulären Auflösungs- und Verbindungsprozess.
 
-- Domain und Identity Public Key,
-- optionale feste öffentliche IPv4-/IPv6-Endpoints,
-- Delegationen und Widerrufe,
-- Domainablauf und Sequenznummer,
-- atomare Key- und Domaintransfers,
-- finalisierte State Roots und Konsensdaten.
+Signiert wird der vollständige kanonische Record. Änderungen erfordern eine höhere Sequenznummer und eine gültige Registry-Signatur.
 
-Nicht dauerhaft gespeichert werden:
+### Service-Record
 
-- Presence Records,
-- Locate Requests und Responses,
-- NAT- und Relay-Zustände,
-- Reverse Paths,
-- Verbindungs- und Nutzdaten.
-
-## Identität und Wiederherstellung
-
-Beim ersten Start erzeugt die Software lokal einen Master Seed. Aus diesem werden deterministisch getrennte Schlüssel abgeleitet:
+Dienste können eigene Adressen, Ports, Protokolle und Zertifikatsbindungen besitzen:
 
 ```text
-Identity Key
-Registry Key
-Discovery Key
-Transport Key
-optional Recovery Key
+ServiceRecord {
+    service
+    hostname
+    ipv4_addresses[]
+    ipv6_addresses[]
+    port
+    transport
+    priority
+    certificate_public_key
+    certificate_delegation
+    valid_until
+}
 ```
 
-Für eine identische Wiederherstellung müssen unverändert sein:
+Beispiele für `service`:
+
+```text
+https
+mail-smtp
+mail-imap
+xmpp-client
+xmpp-server
+api
+custom
+```
+
+Ein Service-Record erweitert den NS-Record. Er ersetzt niemals den Identity Public Key als Vertrauenswurzel.
+
+## Verbindliches Endpoint-Verhalten
+
+```text
+Identity Public Key fehlt:
+    Record ist ungültig.
+
+IPv4 und IPv6 vorhanden:
+    passende Adressen nach Priorität und Happy Eyeballs versuchen;
+    erste erfolgreich authentifizierte Verbindung verwenden.
+
+Nur IPv6 vorhanden:
+    IPv6 regulär verwenden;
+    bei Fehlschlag Presence und Discovery verwenden.
+
+Nur IPv4 vorhanden:
+    IPv4 regulär verwenden;
+    bei Fehlschlag Presence und Discovery verwenden.
+
+Keine IP-Adresse vorhanden:
+    Presence Cache verwenden;
+    falls kein gültiger Record vorhanden ist, Discovery starten.
+
+Service-Record vorhanden:
+    dessen Adressen, Port, Transport und Zertifikatsbindung verwenden.
+
+Kein Service-Record vorhanden:
+    NS-Standardendpoint und den normativ definierten Dienststandard verwenden.
+
+Port nicht gesetzt:
+    normativ festgelegten Standardport des Dienstes verwenden.
+
+Transport nicht gesetzt:
+    normativ festgelegten Standardtransport des Dienstes verwenden.
+
+Endpoint syntaktisch ungültig:
+    nur diesen Endpoint ignorieren.
+
+Endpoint nicht erreichbar:
+    nächsten eingetragenen Endpoint versuchen;
+    danach Presence, NAT Traversal und Relay verwenden.
+
+Endpoint erreichbar, Identitätsprüfung schlägt fehl:
+    Verbindung sofort verwerfen;
+    Endpoint nicht als gültiges Ziel akzeptieren;
+    weitere Endpoints beziehungsweise Presence versuchen.
+```
+
+## Identität und Schlüssel
+
+Beim ersten Start erzeugt die Software lokal einen Master Seed. Daraus werden deterministisch getrennte Schlüssel abgeleitet:
+
+```text
+Identity Key   -> dauerhafte Identität und Delegationswurzel
+Registry Key   -> Domain-, NS- und Service-Records
+Discovery Key  -> Presence und Discovery Sessions
+Transport Key  -> Verbindungs- und Zertifikatsauthentifizierung
+Recovery Key   -> optionale Notfallrotation
+```
+
+Master Seed und Private Keys verlassen das Gerät niemals.
+
+Für eine identische Wiederherstellung müssen unverändert bleiben:
 
 ```text
 Master Seed
 network_id
-Key-Derivation-Verfahren
+KDF und KDF-Parameter
 Key-Version
-verwendete kryptografische Algorithmen
+Kryptografie-Suite
 ```
 
-Der Master Seed und sämtliche Private Keys verlassen das Gerät niemals.
+Nach einer Neuinstallation wird aus demselben Master Seed dieselbe Identity erzeugt. Domains, Records und Delegationen werden aus dem finalisierten Blockchain-State geladen. Eine erneute Registrierung ist nicht erforderlich.
 
-Nach Neuinstallation gilt:
+## Key-Swap
 
-1. Aktuelle PKN-Software herunterladen und deren Release-Signatur prüfen.
-2. Bestehenden Master Seed lokal eingeben oder importieren.
-3. Dasselbe Schlüsselpaar deterministisch wiederherstellen.
-4. Blockchain synchronisieren und Identity-Zustand prüfen.
-5. Bekannte öffentliche Nodes kontaktieren.
-6. Neuen Discovery Session Key erzeugen.
-7. Presence Record veröffentlichen.
-8. Bestehende Domains und Delegationen lokal laden.
+Ein Identity-Wechsel erfolgt atomar:
 
-Eine erneute Identity- oder Domainregistrierung ist nicht erforderlich. Ohne Master Seed oder vorher eingerichteten Recovery Key ist die Identität nicht wiederherstellbar.
+1. Neue Identity lokal erzeugen.
+2. Transfer mit alter Identity signieren.
+3. Übernahme mit neuer Identity signieren.
+4. Domains und Delegationen im selben finalisierten Zustandswechsel übertragen.
+5. Neue Service- und Zertifikatsdelegationen aktivieren.
+6. Alte Schlüssel für neue Operationen widerrufen.
+7. Alten Seed erst nach Finalisierung und getesteter Wiederherstellung löschen.
 
 ## Presence Records
 
-Jeder aktive Host veröffentlicht alle fünf Minuten einen signierten Presence Record. Er wird über das PKN-Netz verteilt und nur flüchtig gespeichert.
+Ein aktiver Host veröffentlicht alle fünf Minuten einen signierten Presence Record. Presence Records werden nicht in Blöcken gespeichert.
 
 ```text
 PresenceRecord {
+    version
+    network_id
     identity_public_key
     discovery_session_public_key
     session_delegation
@@ -140,193 +230,199 @@ PresenceRecord {
 }
 ```
 
-Vorgaben:
-
 ```text
 Sendeintervall: 5 Minuten
 Gültigkeit:     15 Minuten
 ```
 
-Jeder Node speichert pro Identity nur den Record mit der höchsten gültigen Sequenznummer. Ein Record wird nur akzeptiert, wenn Signatur, Delegation, Ablaufzeit und Identity-Bindung gültig sind.
+Pro Identity wird nur der Record mit der höchsten gültigen Sequenznummer verwendet. Akzeptiert werden ausschließlich Records mit gültiger Signatur, Delegation, `network_id`, Identity-Bindung und Ablaufzeit.
+
+Abgelaufene Records werden nicht als Locator verwendet. Sie dürfen lokal nur darauf hinweisen, welche Cache-Nodes zuletzt erfolgreich waren.
 
 ## Discovery
 
-Wenn kein funktionierender fester Endpoint und kein lokaler gültiger Presence Record vorhanden ist:
+Wenn kein eingetragener Endpoint funktioniert und kein gültiger Presence Record lokal vorliegt:
 
-1. Die Quelle erstellt einen signierten Locate Request für den Ziel-Public-Key.
-2. Der Request wird kontrolliert über bestehende PKN-Peer-Verbindungen verteilt.
+1. Quelle erstellt einen signierten Locate Request für den Ziel-Public-Key.
+2. Request wird kontrolliert über bestehende PKN-Peer-Verbindungen verteilt.
 3. Jeder Node verarbeitet dieselbe Request-ID nur einmal.
-4. Es wird keine Richtung aus dem Public Key oder dessen Hash berechnet.
-5. Das Ziel oder ein Host mit gültigem Presence Record antwortet.
-6. Cache-Hosts dürfen ausschließlich den unveränderten, vom Ziel signierten Record zurückgeben.
-7. Die Antwort verwendet gespeicherte Reverse Paths; bei Ausfall ist begrenzte redundante Verteilung zulässig.
-8. Nach erfolgreichem Verbindungsaufbau laufen Discovery-Daten automatisch ab.
+4. Es wird keine Route aus dem Public Key oder dessen Hash berechnet.
+5. Ziel oder Cache-Host mit gültigem Presence Record antwortet.
+6. Cache-Hosts dürfen ausschließlich unveränderte, vom Ziel signierte Records liefern.
+7. Antwort verwendet kurzlebig gespeicherte Reverse Paths.
+8. Bei Pfadausfall ist begrenzte redundante Antwortverteilung zulässig.
+9. Discovery-Daten laufen nach TTL oder erfolgreichem Verbindungsaufbau ab.
 
-PKN verwendet beim Discovery-Aufbau kontrolliertes Gossip, kein Baum- und kein Hash-Distanz-Routing.
+PKN verwendet kontrolliertes Gossip und kein Hash-Distanz- oder Baum-Routing.
 
-## Verbindungsaufbau
-
-Die Transportwege werden in dieser Reihenfolge versucht:
+### Reihenfolge der Presence-Suche
 
 ```text
-1. feste signierte IPv6
-2. feste signierte IPv4
-3. direkte Candidates aus Presence Record
-4. NAT Traversal
-5. Relay
+1. lokaler gültiger Presence Record
+2. Cache-Nodes der letzten erfolgreichen Sitzung
+3. aktuell verbundene PKN-Peers
+4. allgemeine kontrollierte Discovery
 ```
 
-Ein erfolgreicher TCP-, UDP- oder QUIC-Verbindungsaufbau reicht nicht als Identitätsnachweis. Die Gegenstelle muss im Handshake einen Transport- oder Service-Key nachweisen, der gültig auf den Blockchain Identity Public Key zurückgeführt werden kann.
+## Transport und NAT
 
-Der Handshake verwendet:
+Der lokale PKN-Agent versucht:
 
-- ephemeren Schlüsselaustausch,
-- signiertes Handshake-Transkript,
-- getrennte Richtungsschlüssel,
-- authentifizierte Verschlüsselung,
-- Sequenznummern und Replay-Schutz,
-- regelmäßiges Rekeying.
+```text
+1. eingetragene IPv6-/IPv4-Service-Endpoints
+2. direkte Candidates aus Presence
+3. NAT Traversal
+4. Relay
+```
 
-Nach Aufbau der Sitzung laufen Nutzdaten direkt zwischen den Endpunkten oder Ende-zu-Ende verschlüsselt über einen Relay. Andere PKN-Peers sind nicht beteiligt.
+NAT Traversal und Relay werden nur für den Verbindungsaufbau beziehungsweise als Transportweg verwendet. Nach erfolgreichem Aufbau laufen Nutzdaten direkt oder Ende-zu-Ende verschlüsselt über einen Relay. Andere PKN-Peers transportieren keine Nutzdaten der Sitzung.
+
+Öffentlich erreichbare Nodes dürfen signiert folgende Capabilities anbieten:
+
+```text
+PRESENCE_CACHE
+NAT_OBSERVER
+NAT_COORDINATOR
+RELAY
+BOOTSTRAP
+```
+
+Keiner dieser Nodes entscheidet über Identity, Domainbesitz oder Zertifikatsgültigkeit.
+
+## Authentifizierter Handshake
+
+Jede neue Verbindung verwendet einen ephemeren Schlüsselaustausch. Beide Seiten signieren das vollständige Handshake-Transkript mit einem gültig delegierten Transport- oder Service-Key.
+
+Geprüft werden mindestens:
+
+- erwartete Domain und Identity,
+- Service und Protokoll,
+- Zertifikats- beziehungsweise Schlüssel-Delegation,
+- Ablauf und Widerruf,
+- beide ephemeren Schlüssel,
+- ausgehandelte Algorithmen,
+- Request-ID beziehungsweise Sitzungskontext.
+
+Danach werden getrennte Richtungsschlüssel und ein Rekey-Schlüssel abgeleitet. Nutzdaten werden ausschließlich authentifiziert verschlüsselt übertragen.
 
 ## Lokaler PKN-Agent
 
-Jede Installation betreibt einen lokalen Agenten. Er übernimmt:
+Jede Installation betreibt einen lokalen Agenten für:
 
 - `.pkn`-Auflösung,
+- Verarbeitung von NS- und Service-Records,
 - Schlüsselableitung und lokale Schlüsselverwaltung,
 - Blockchain-Synchronisierung und Proof-Prüfung,
 - Peer- und Presence-Cache,
 - Presence-Publikation,
 - Discovery,
-- Endpoint-Auswahl,
-- NAT-Erkennung und NAT Traversal,
-- Relay-Auswahl,
-- Handshake- und Zertifikatsprüfung,
-- lokale API für Browser, Anwendungen und Plugins.
+- IPv4-/IPv6- und Service-Endpoint-Auswahl,
+- NAT Traversal und Relay-Auswahl,
+- Zertifikats-, Service- und Handshake-Prüfung,
+- lokale API für Browser, Plugins und Anwendungen.
 
-Die lokale API wird ausschließlich über Unix Socket oder Loopback angeboten und muss authentifiziert sein.
+Die API wird ausschließlich über einen authentifizierten Unix Socket oder Loopback-Endpunkt angeboten.
 
 ## Erstmaliger Netzwerkstart
 
-Während der initialen Aufbauphase stellt ein zentral betriebener Server bereit:
+Während der Aufbauphase stellt ein zentral betriebener Server bereit:
 
 - signierte Software-Releases,
 - Genesis-Daten und `network_id`,
-- einen bekannten authentifizierten Bootstrap-Endpoint,
+- bekannten authentifizierten Bootstrap-Endpoint,
 - initiale Blockchain-Synchronisierung,
-- Austausch öffentlich erreichbarer Nodes,
+- Liste öffentlich erreichbarer Nodes,
 - bei Bedarf Presence-, NAT- und Relay-Hilfe.
 
-Der Client sendet nur öffentliche Daten und signierte Protokollnachrichten. Master Seed und Private Keys werden niemals übertragen.
+Der Client überträgt ausschließlich öffentliche Schlüssel und signierte Protokollnachrichten. Master Seed und Private Keys werden niemals übertragen.
 
-Der Startserver ist in dieser Phase Transport- und Bootstrap-Hilfe. Blockchain-Zustände müssen trotzdem lokal validiert werden.
+Der Startserver ist Bootstrap- und Transporthilfe. Blockchain-Zustände werden immer lokal validiert.
 
 ## Übergang zum dezentralen Betrieb
 
-Die Software wechselt automatisch und anhand des finalisierten Blockchain-Zustands in den dezentralen Betriebsmodus. Die Aktivierung darf nicht allein durch eine Behauptung des Startservers erfolgen.
+Die Software wechselt anhand des finalisierten Blockchain-Zustands automatisch in den dezentralen Modus. Die Aktivierung berücksichtigt mindestens:
 
-Die Aktivierung berücksichtigt mindestens:
-
-- eine festgelegte Mindestzahl registrierter und aktiver Teilnehmer,
+- festgelegte Mindestzahl registrierter und aktiver Teilnehmer,
 - mehrere unabhängige öffentliche Nodes,
 - mehrere aktive Validatoren,
 - stabile Finalität über mehrere Epochen,
-- ausreichende Verteilung auf unabhängige Netzbereiche.
+- Verteilung auf unabhängige Netzbereiche.
 
-Der geplante Teilnehmerwert von ungefähr 1.000 Identitäten ist eine notwendige, aber allein nicht ausreichende Bedingung.
+Der geplante Wert von ungefähr 1.000 Identitäten reicht allein nicht aus, sondern ist nur eine Mindestbedingung.
 
-Nach der finalisierten Aktivierung:
+Nach Aktivierung:
 
-- besitzt der Startserver keine besondere Blockchain-Rolle mehr,
+- besitzt der ursprüngliche Server keine besondere Blockchain-Rolle,
 - kann er keine Zustände allein finalisieren,
 - kann er keine Teilnehmer zulassen oder sperren,
 - kann er keine Protokollparameter allein ändern,
 - wird er höchstens als normaler Node behandelt,
-- darf er weiterhin Software und öffentliche Node-Listen bereitstellen.
-
-Der Verlust der Sonderrechte wird von allen installierten Nodes selbst aus dem finalisierten State erkannt.
+- darf er weiterhin signierte Software und öffentliche Node-Listen verteilen.
 
 ## Öffentliche Node-Liste und Wiederanbindung
 
-Der Software-Server beobachtet ausschließlich öffentlich angebotene PKN-Nodes und erstellt daraus eine Release-Node-Liste. Er speichert und verteilt dabei nur:
+Der Software-Server erfasst ausschließlich freiwillig öffentlich angebotene Nodes:
 
 ```text
-Node Identity Public Key
-öffentliche IPv4/IPv6
-Port und Transport
-Capabilities
-Zeitpunkt der letzten erfolgreichen Prüfung
-Signatur beziehungsweise Identitätsnachweis
+PublicNodeEntry {
+    node_identity_public_key
+    public_ipv4_addresses[]
+    public_ipv6_addresses[]
+    port
+    transport
+    capabilities[]
+    last_successful_check
+    identity_proof
+}
 ```
 
-Nicht erfasst oder verteilt werden:
+Er erfasst keine Private Keys, Master Seeds, lokalen IP-Adressen, Nutzdaten oder nicht öffentlich angebotenen Nodes.
 
-- Private Keys oder Master Seeds,
-- private oder lokale IP-Adressen,
-- Nutzdaten,
-- Kommunikationsinhalte,
-- nicht öffentlich angebotene Nodes.
+Die Liste ist Bootstrap-Hilfe und keine Vertrauensquelle. Jeder Node wird beim Verbindungsaufbau kryptografisch authentifiziert.
 
-Die Liste ist Bootstrap-Hilfe und keine Vertrauensquelle. Jeder Eintrag wird beim Verbindungsaufbau kryptografisch authentifiziert.
-
-Startreihenfolge im laufenden Betrieb:
+Startreihenfolge:
 
 ```text
 1. lokalen Blockchain-State laden
 2. Peers der letzten Sitzung kontaktieren
-3. zuletzt erfolgreiche Presence-Cache-Nodes befragen
+3. bekannte Presence-Cache-Nodes befragen
 4. integrierte öffentliche Nodes versuchen
-5. Software-Server nur als zusätzlichen Bootstrap-Fallback verwenden
+5. Software-Server als zusätzlichen Bootstrap-Fallback verwenden
 6. mehrere unabhängige Peers authentifizieren
 7. finalisierten State synchronisieren
 8. eigenen Presence Record erneuern
 ```
 
-Ein abgelaufener Presence Record darf nur als Hinweis auf frühere Cache-Nodes dienen. Er darf nicht unmittelbar als gültiger Locator verwendet werden.
-
-## Softwareverteilung nach der Dezentralisierung
-
-Der ursprüngliche Server darf weiterhin:
-
-- signierte Releases anbieten,
-- Installationsdateien bereitstellen,
-- aktuelle öffentliche Node-Listen in neue Releases einbinden,
-- einen normalen Bootstrap-Endpoint betreiben,
-- Dokumentation und Testvektoren veröffentlichen.
-
-Er erhält dadurch keine Kontrolle über Blockchain, Identitäten, Domains oder Konsens.
-
-Die Software muss mehrere Release- und Bootstrap-Quellen unterstützen. Release-Dateien werden vor Installation gegen fest verankerte Release Keys geprüft.
+Nach langer Offline-Zeit kann die aktuelle signierte Software erneut geladen und mit dem vorhandenen Master Seed dieselbe Identity wiederhergestellt werden.
 
 ## Domain-Lebenszyklus
 
-- Eine Domain ist für einen festgelegten Zeitraum registriert.
-- Der Besitzer verlängert sie mit dem gültigen Registry Key.
+- Domainregistrierung gilt für den normativ festgelegten Zeitraum.
+- Verlängerung erfolgt mit dem gültigen Registry Key.
 - Nach Ablauf gilt eine definierte Grace Period.
-- Danach wird die Domain wieder registrierbar.
-- Subdomains werden vom Besitzer signiert verwaltet.
-- Ein Key-Swap benötigt die Signatur der alten und neuen Identity.
-- Domains werden beim Key-Swap atomar und ohne Zwischenfreigabe übertragen.
+- Danach wird die Domain erneut registrierbar.
+- Subdomains und Services werden vom Besitzer signiert verwaltet.
+- Änderungen an NS- oder Service-Records erhöhen die Sequenznummer.
+- Key-Swap überträgt Domains und Delegationen atomar.
 
 ## Sicherheitsregeln
 
-- Identity Public Key aus der finalisierten Blockchain ist die alleinige Vertrauenswurzel.
-- IP-Adressen, Bootstrap-Listen, Presence-Caches und Relays bestimmen nur Erreichbarkeit.
-- Alle sicherheitsrelevanten Strukturen werden kanonisch kodiert und signiert.
+- Identity Public Key ist in jedem gültigen NS-Record verpflichtend.
+- Eingetragene Endpoints werden regulär verwendet.
+- Leere Endpoint-Listen lösen Presence und Discovery aus.
+- IP-Adressen und Relays sind Locator, keine Identitäten.
+- Zertifikate und Services müssen auf die Blockchain-Identity zurückführbar sein.
+- Sämtliche sicherheitsrelevanten Records werden kanonisch kodiert und signiert.
 - Ungültige, abgelaufene, widerrufene oder ältere Records werden verworfen.
-- Request-IDs, Sequenznummern, Nonces und TTLs verhindern Wiederholungen.
+- Request-IDs, Sequenznummern, Nonces und TTLs verhindern Replays.
 - Paket-, Cache-, Bandbreiten- und Relay-Ressourcen besitzen harte Grenzen.
-- Format, Version, Größe, TTL und Limits werden vor teurer Kryptografie geprüft.
+- Günstige Prüfungen erfolgen vor teuren kryptografischen Operationen.
 - Bei hoher Last darf adaptiver Proof of Work verlangt werden.
 - Relays erhalten keinen Zugriff auf Klartext oder Sitzungsschlüssel.
 - Unprüfbare Sicherheitsentscheidungen werden fail-closed abgelehnt.
-- DDoS wird begrenzt, kann aber auf physischer Ebene nicht ausgeschlossen werden.
-- Ohne festen Endpoint, gültigen Presence Record, erreichbaren Zielpfad oder Relay ist ein offline befindlicher Host nicht erreichbar.
+- DDoS wird begrenzt, kann physisch jedoch nicht ausgeschlossen werden.
 
 ## Softwareanforderungen
-
-Die Implementierung umfasst mindestens:
 
 ### Node Core
 
@@ -342,47 +438,56 @@ Die Implementierung umfasst mindestens:
 ### Key Manager
 
 - Master Seed sicher erzeugen, anzeigen und importieren,
-- Schlüsselpaar deterministisch wiederherstellen,
+- dieselbe Identity deterministisch wiederherstellen,
 - zweckgebundene Schlüssel ableiten,
 - Delegationen und Widerrufe verwalten,
 - optionalen Recovery Key verwalten,
 - atomaren Key-Swap durchführen,
 - Private Keys verschlüsselt speichern.
 
-### Domain Manager
+### Domain-, NS- und Service-Manager
 
 - Domains registrieren, verlängern, übertragen und freigeben,
-- feste IPv4-/IPv6-Endpoints verwalten,
-- Subdomains und Service-Delegationen verwalten,
-- Domainstatus und Proofs anzeigen.
+- IPv4-/IPv6-Listen vollständig verwalten,
+- Ports, Transporte und Prioritäten verwalten,
+- Service-Records für Web, Mail, XMPP und weitere Dienste verwalten,
+- Zertifikats- und Service-Key-Delegationen erzeugen und prüfen,
+- Records kanonisch signieren,
+- Sequenznummern automatisch erhöhen,
+- Domainstatus, Ablauf und Proofs anzeigen.
 
 ### Network Agent
 
 - `.pkn`-Resolver und lokale API,
+- NS- und Service-Records auswerten,
 - öffentliche Adressen und NAT-Typ erkennen,
 - Presence Record alle fünf Minuten erneuern,
 - Cache-Nodes der letzten Sitzung befragen,
 - Peers und Bootstrap-Quellen verwalten,
-- Connection Candidates priorisieren,
+- Endpoints nach Priorität und Happy Eyeballs versuchen,
 - NAT Traversal und Relay-Circuits verwalten.
 
 ### Betrieb
 
 - signierte Softwareupdates,
+- sichere Release-Key-Rotation,
 - versionierte Datenmigration,
 - datensparsame Logs ohne Secrets,
 - standardmäßig deaktivierte Telemetrie,
-- Status und Diagnose für Chain, Peers, Presence, Discovery und Verbindung.
+- Diagnose für Chain, Peers, Presence, Discovery, Services und Verbindungen.
 
-## Offene Protokollparameter
+## Normativ noch festzulegende Parameter
 
-Vor einer Implementierung müssen noch normativ festgelegt werden:
+Vor einer interoperablen Implementierung müssen festgelegt werden:
 
-- konkrete Kryptografie-Suite,
+- Kryptografie-Suite,
 - kanonisches Binärformat,
-- konkretes Konsensverfahren und Sybil-Schutz,
-- Aktivierungsbedingungen für den dezentralen Modus,
+- Konsensverfahren und Sybil-Schutz,
+- Aktivierungsbedingungen des dezentralen Modus,
 - Domainlaufzeit und Grace Period,
+- Standardports und Standardtransporte je Dienst,
+- IPv4-/IPv6-Verbindungsstaffelung,
+- maximale Adress- und Service-Anzahl pro Record,
 - Paket-, Cache-, Fan-out- und Hop-Limits,
 - Proof-of-Work-Grenzen,
 - NAT-, QUIC-, TCP- und Relay-Parameter,
@@ -390,4 +495,4 @@ Vor einer Implementierung müssen noch normativ festgelegt werden:
 
 ## Projektstatus
 
-PKN ist derzeit ein Architekturentwurf. Vor einem öffentlichen Testnetz sind normative Paketformate, Testvektoren, Interoperabilitätstests, Fuzzing, Konsenssimulationen, Lasttests und unabhängige Sicherheitsprüfungen erforderlich.
+PKN ist ein Architekturentwurf. Vor einem öffentlichen Testnetz sind normative Paketformate, Testvektoren, Interoperabilitätstests, Fuzzing, Konsenssimulationen, Lasttests und unabhängige Sicherheitsprüfungen erforderlich.
